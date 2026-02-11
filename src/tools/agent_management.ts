@@ -22,7 +22,7 @@ const SubAgentConfigSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   instructions: z.string(),
-  model: z.string().optional(),
+  model: z.string().optional(), 
   tools: z.array(z.string()).optional().describe("IDs of tools this agent can use"),
 });
 
@@ -76,16 +76,18 @@ export const makeUpdateAgentTool = (onAgentUpdated: (id: string, updates: Partia
       supervisorConfig: SupervisorConfigSchema.optional(),
       memory: z.boolean().optional(),
       tools: z.array(z.string()).optional(),
-      // Updating subagents via this tool is tricky (replace vs append). 
-      // For now, let's skip subagents in update or allow full replacement.
-      // Let's omit subagents in update for simplicity unless requested.
+      subagents: z.array(SubAgentConfigSchema).optional().describe("Replace sub-agents list"),
     }).describe("Fields to update"),
   }),
   execute: async (args) => {
     try {
       const fullConfig = await AgentRepository.update(args.id, args.updates);
       onAgentUpdated(args.id, fullConfig);
-      return { success: true, message: `Agent '${args.id}' updated successfully.` };
+      return { 
+        success: true, 
+        message: `Agent '${args.id}' updated successfully.`,
+        config: fullConfig 
+      };
     } catch (e: any) {
       return { success: false, error: e.message };
     }
@@ -94,14 +96,14 @@ export const makeUpdateAgentTool = (onAgentUpdated: (id: string, updates: Partia
 
 export const listAgentsTool = createTool({
   name: "list_agents",
-  description: "List all available agents.",
+  description: "List all available agents with their full configurations.",
   parameters: z.object({}),
   execute: async () => {
     try {
       const agents = await AgentRepository.all();
       return {
         success: true,
-        agents: agents.map(a => ({ id: a.id, name: a.name, description: a.description }))
+        agents: agents // Returning full configs
       };
     } catch (e: any) {
       return { success: false, error: e.message };
@@ -155,8 +157,8 @@ export const makeAddSubAgentTool = (addSubAgent: (parentId: string, subAgentId: 
   name: "add_subagent",
   description: "Add an existing agent as a sub-agent to another agent (or yourself). Use this to form teams dynamically.",
   parameters: z.object({
-    parentId: z.string().describe("ID of the parent agent (e.g., 'controller-agent')"),
-    subAgentId: z.string().describe("ID of the agent to add as sub-agent"),
+    parentId: z.string().describe("ID of the parent agent who will supervise (e.g., 'orchestrator-agent'). Use YOUR OWN ID if you want to be the supervisor."),
+    subAgentId: z.string().describe("ID of the existing agent to add as sub-agent"),
   }),
   execute: async (args) => {
     try {
@@ -175,7 +177,7 @@ export const makeRemoveSubAgentTool = (removeSubAgent: (parentId: string, subAge
   name: "remove_subagent",
   description: "Remove a sub-agent from a parent agent's supervision. Use this to dissolve teams after tasks are complete.",
   parameters: z.object({
-    parentId: z.string().describe("ID of the parent agent"),
+    parentId: z.string().describe("ID of the parent agent. Use YOUR OWN ID if you are the current supervisor."),
     subAgentId: z.string().describe("ID of the sub-agent to remove"),
   }),
   execute: async (args) => {
@@ -185,6 +187,41 @@ export const makeRemoveSubAgentTool = (removeSubAgent: (parentId: string, subAge
         return { success: true, message: `Agent '${args.subAgentId}' removed from '${args.parentId}'.` };
       }
       return { success: false, error: `Failed to remove sub-agent. Ensure IDs are correct.` };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+});
+
+export const makeLogMonitorEventTool = (logEvent: (icon: string, message: string) => void) => createTool({
+  name: "log_monitor_event",
+  description: "Log a major task step or event to the activity monitor. Use this to provide transparency on your internal reasoning and progress.",
+  parameters: z.object({
+    icon: z.string().describe("Emoji icon for the event (e.g., 🔍, 🏗️, ✅, ❌)"),
+    message: z.string().describe("Descriptive message of the event or step being taken"),
+  }),
+  execute: async (args) => {
+    try {
+      logEvent(args.icon, args.message);
+      return { success: true, message: `Logged event to monitor: ${args.message}` };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+});
+export const makeDeleteAgentTool = (deleteAgent: (id: string) => Promise<boolean>) => createTool({
+  name: "delete_agent",
+  description: "Completely delete an agent from the system. Use this to permanently remove specialized agents after their task is finished and they have been removed from any teams.",
+  parameters: z.object({
+    id: z.string().describe("ID of the agent to delete"),
+  }),
+  execute: async (args) => {
+    try {
+      const success = await deleteAgent(args.id);
+      if (success) {
+        return { success: true, message: `Agent '${args.id}' successfully deleted from the system.` };
+      }
+      return { success: false, error: `Failed to delete agent '${args.id}'. Agent might not exist.` };
     } catch (e: any) {
       return { success: false, error: e.message };
     }

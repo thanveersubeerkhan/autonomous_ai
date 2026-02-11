@@ -46,7 +46,24 @@ export class AgentManager {
     return this.map[id];
   }
 
+  async deleteAgent(id: string) {
+    delete this.map[id];
+    const { AgentRepository } = await import("./agent-repository");
+    try {
+      await AgentRepository.delete(id);
+      Monitor.logEvent("🗑️", `Agent [${id}] deleted from system.`);
+      return true;
+    } catch (e) {
+      console.error(`Failed to delete agent [${id}] from repository:`, e);
+      return false;
+    }
+  }
+
   addSubAgent(parentId: string, subAgentId: string) {
+    if (parentId === subAgentId) {
+      console.warn(`⚠️ Attempted to add agent [${parentId}] as a sub-agent to itself. Aborting to prevent recursion.`);
+      return false;
+    }
     const parent = this.map[parentId];
     const sub = this.map[subAgentId];
     if (parent && sub) {

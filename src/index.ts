@@ -11,7 +11,7 @@ import { AgentRepository } from "./services/agent-repository";
 import { AgentManager } from "./services/agent-manager";
 import { memory } from "./infrastructure/memory";
 import { internetSearchTool } from "./tools/internet_search";
-import { makeCreateAgentTool, makeUpdateAgentTool, listAgentsTool, makeListToolsTool, makeTestAgentTool, makeAddSubAgentTool, makeRemoveSubAgentTool } from "./tools/agent_management";
+import { makeCreateAgentTool, makeUpdateAgentTool, listAgentsTool, makeAddSubAgentTool, makeRemoveSubAgentTool, makeLogMonitorEventTool, makeDeleteAgentTool, makeListToolsTool, makeTestAgentTool } from "./tools/agent_management";
 import { makeListModelsTool } from "./tools/model_management"; 
 
 import { Monitor } from "./infrastructure/monitor";
@@ -26,7 +26,7 @@ const registerDynamicAgents = (agentMap: Record<string, any>) => {
     voltInstance.registerAgents(agentMap);
     console.log(`📡 Dynamically registered agents: ${Object.keys(agentMap).join(", ")}`); 
   } 
-}; 
+};  
 
 // Register all system tools
 agentManager.registerTool(internetSearchTool);
@@ -42,6 +42,8 @@ agentManager.registerTool(makeCreateAgentTool((config) => {
 
 agentManager.registerTool(makeAddSubAgentTool(agentManager.addSubAgent.bind(agentManager)));
 agentManager.registerTool(makeRemoveSubAgentTool(agentManager.removeSubAgent.bind(agentManager)));
+agentManager.registerTool(makeLogMonitorEventTool(Monitor.logEvent.bind(Monitor)));
+agentManager.registerTool(makeDeleteAgentTool(agentManager.deleteAgent.bind(agentManager)));
 
 agentManager.registerTool(makeUpdateAgentTool((id, fullConfig) => {
   const agent = agentManager.updateAgent(fullConfig);

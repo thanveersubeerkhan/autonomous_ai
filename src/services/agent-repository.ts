@@ -4,7 +4,7 @@ export interface AgentConfig {
   id: string;
   name: string;
   instructions: string;
-  model: string;
+  model?: string;
   description?: string;
   subagents?: AgentConfig[];
   supervisorConfig?: SupervisorConfig;
