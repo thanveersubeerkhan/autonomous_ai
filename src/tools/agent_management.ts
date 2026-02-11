@@ -227,3 +227,16 @@ export const makeDeleteAgentTool = (deleteAgent: (id: string) => Promise<boolean
     }
   },
 });
+export const makeReloadAgentsTool = (reload: () => Promise<void>) => createTool({
+  name: "reload_agents",
+  description: "Synchronize the server's in-memory agents with the database. Use this after making manual database changes or when the system state feels out of sync.",
+  parameters: z.object({}),
+  execute: async () => {
+    try {
+      await reload();
+      return { success: true, message: "Agents reloaded from database and server state synchronized." };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+});

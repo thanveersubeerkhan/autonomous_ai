@@ -47,6 +47,9 @@ export class AgentManager {
   }
 
   async deleteAgent(id: string) {
+    if (!this.map[id]) {
+        console.warn(`⚠️ Attempted to delete agent [${id}] which doesn't exist in memory.`);
+    }
     delete this.map[id];
     const { AgentRepository } = await import("./agent-repository");
     try {
@@ -57,6 +60,11 @@ export class AgentManager {
       console.error(`Failed to delete agent [${id}] from repository:`, e);
       return false;
     }
+  }
+
+  clear() {
+    this.map = {};
+    Monitor.logEvent("🧹", "Agent Manager memory cleared.");
   }
 
   addSubAgent(parentId: string, subAgentId: string) {

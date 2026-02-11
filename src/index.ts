@@ -11,11 +11,13 @@ import { AgentRepository } from "./services/agent-repository";
 import { AgentManager } from "./services/agent-manager";
 import { memory } from "./infrastructure/memory";
 import { internetSearchTool } from "./tools/internet_search";
-import { makeCreateAgentTool, makeUpdateAgentTool, listAgentsTool, makeAddSubAgentTool, makeRemoveSubAgentTool, makeLogMonitorEventTool, makeDeleteAgentTool, makeListToolsTool, makeTestAgentTool } from "./tools/agent_management";
+import { makeCreateAgentTool, makeUpdateAgentTool, listAgentsTool, makeAddSubAgentTool, makeRemoveSubAgentTool, makeLogMonitorEventTool, makeDeleteAgentTool, makeListToolsTool, makeTestAgentTool, makeReloadAgentsTool } from "./tools/agent_management";
 import { makeListModelsTool } from "./tools/model_management"; 
 
 import { Monitor } from "./infrastructure/monitor";
 import { updateToolCapableModels } from "./utils/model-utils";
+
+import { AgentRegistry } from "@voltagent/core";
 
 const agentManager = new AgentManager();
 
@@ -28,12 +30,25 @@ const registerDynamicAgents = (agentMap: Record<string, any>) => {
   } 
 };  
 
+const reloadAgents = async () => {
+    agentManager.clear();
+    const registry = AgentRegistry.getInstance();
+    // Clear registry if possible, otherwise we rely on manager to refresh
+    // Based on d.ts, removeAgent(id) is how we remove. There is no clear() on registry.
+    // So we just re-seed the manager and then re-register everything.
+    const rows = await AgentRepository.all();
+    agentManager.ensure(rows);
+    registerDynamicAgents(agentManager.map);
+    console.log("♻️ Agents reloaded from repository.");
+};
+
 // Register all system tools
 agentManager.registerTool(internetSearchTool);
 agentManager.registerTool(listAgentsTool);
 agentManager.registerTool(makeListModelsTool(process.env.OPENROUTER_API_KEY!));
 agentManager.registerTool(makeListToolsTool(agentManager.tools));
 agentManager.registerTool(makeTestAgentTool(agentManager.get.bind(agentManager)));
+agentManager.registerTool(makeReloadAgentsTool(reloadAgents));
 
 agentManager.registerTool(makeCreateAgentTool((config) => {
   const agent = agentManager.createAgent(config);
@@ -43,7 +58,14 @@ agentManager.registerTool(makeCreateAgentTool((config) => {
 agentManager.registerTool(makeAddSubAgentTool(agentManager.addSubAgent.bind(agentManager)));
 agentManager.registerTool(makeRemoveSubAgentTool(agentManager.removeSubAgent.bind(agentManager)));
 agentManager.registerTool(makeLogMonitorEventTool(Monitor.logEvent.bind(Monitor)));
-agentManager.registerTool(makeDeleteAgentTool(agentManager.deleteAgent.bind(agentManager)));
+
+agentManager.registerTool(makeDeleteAgentTool(async (id) => {
+    const success = await agentManager.deleteAgent(id);
+    if (success) {
+        AgentRegistry.getInstance().removeAgent(id);
+    }
+    return success;
+}));
 
 agentManager.registerTool(makeUpdateAgentTool((id, fullConfig) => {
   const agent = agentManager.updateAgent(fullConfig);

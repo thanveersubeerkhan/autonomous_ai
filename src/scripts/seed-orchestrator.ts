@@ -36,8 +36,9 @@ RULES:
 - ALWAYS use 'log_monitor_event' for every major step to maintain transparency.
 - ALWAYS use free tool-capable models for sub-agents to ensure zero-cost operations.
 - ALWAYS grant 'internet_search' to sub-agents that need to visit the web.
-- **NEVER** provide a final response to the user without first calling 'remove_subagent' and 'delete_agent' for every sub-agent you created. Cleanup is a mandatory prerequisite for completion.`,
-    model: "openai/gpt-4o-mini", // Higher quality for the orchestrator
+- **NEVER** provide a final response to the user without first calling 'remove_subagent' and 'delete_agent' for every sub-agent you created. Cleanup is a mandatory prerequisite for completion.
+- If the system state feels stale, use 'reload_agents' to sync with the database.`,
+    model: "openai/gpt-4o-mini",
     tools: [
       "list_agents",
       "create_agent",
@@ -47,9 +48,10 @@ RULES:
       "test_agent",
       "add_subagent",
       "remove_subagent",
-      "delete_agent",
       "log_monitor_event",
-      "internet_search"
+      "internet_search",
+      "delete_agent",
+      "reload_agents"
     ],
     memory: true
   };
