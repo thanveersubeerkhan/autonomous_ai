@@ -34,7 +34,7 @@ export const makeCreateAgentTool = (onAgentCreated: (config: AgentConfig) => voi
     name: z.string().describe("Human readable name"),
     description: z.string().describe("Short description of what the agent does (used as purpose for supervisors)"),
     instructions: z.string().describe("System instructions for the agent behavior"),
-    model: z.string().optional().default("openai/gpt-4o-mini").describe("Model ID to use"),
+    model: z.string().optional().default("nvidia/nemotron-3-nano-30b-a3b:free").describe("Model ID to use"),
     supervisorConfig: SupervisorConfigSchema.optional().describe("Configuration if this agent supervises others"),
     subagents: z.array(SubAgentConfigSchema).optional().describe("List of sub-agents this agent supervises (inline definitions)"),
     memory: z.boolean().optional().describe("Enable long-term memory for this agent"),
