@@ -2,94 +2,83 @@ import { tool } from "@voltagent/core";
 import { z } from "zod";
 
 /**
- * Tool to list ONLY free + tool-capable models from OpenRouter
- * Hard-gated for autonomous agent spawning
+ * Tool to list NVIDIA models that are SAFE for autonomous agents
+ * Uses NVIDIA /v1/models endpoint (OpenAI-compatible)
  */
 export const makeListModelsTool = (apiKey: string) =>
   tool({
     name: "list_free_tool_models",
     description:
-      "List ONLY free AI models from OpenRouter that support tool/function calling. Used for safe, zero-cost autonomous sub-agent provisioning.",
+      "List NVIDIA models that are compatible with tool/function calling and safe for autonomous agent usage.",
+
     parameters: z.object({
-      category: z
+      family: z
         .enum([
-          "programming",
-          "roleplay",
-          "marketing",
-          "marketing/seo",
-          "technology",
-          "science",
-          "translation",
-          "legal",
-          "finance",
-          "health",
-          "trivia",
-          "academia",
+          "nemotron",
+          "llama",
+          "kimi",
+          "mixtral",
         ])
         .optional()
-        .describe("Optional category filter"),
+        .describe("Optional model family filter"),
     }),
-    execute: async ({ category }) => {
-      try {
-        let url = "https://openrouter.ai/api/v1/models";
-        if (category) {
-          url += `?category=${encodeURIComponent(category)}`;
-        }
 
-        const response = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "HTTP-Referer": "https://fazzai.com",
-            "X-Title": "Fazzai Mission Control",
-          },
-        });
+    execute: async ({ family }) => {
+      try {
+        const response = await fetch(
+          "https://integrate.api.nvidia.com/v1/models",
+          {
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
         if (!response.ok) {
-          throw new Error(`OpenRouter API error: ${response.statusText}`);
+          throw new Error(`NVIDIA API error: ${response.statusText}`);
         }
 
         const { data } = await response.json();
-        let models = Array.isArray(data) ? data : [];
+        const models = Array.isArray(data) ? data : [];
 
-        // Normalize + enforce constraints
         const filtered = models
           .map((m: any) => {
-            const params = m.supported_parameters || [];
-            const supportsTools =
-              params.includes("tools") ||
-              params.includes("functions") ||
-              m.description?.toLowerCase().includes("tool") ||
-              m.description?.toLowerCase().includes("function calling");
+            const id = m.id || "";
 
-            const promptPrice = parseFloat(m.pricing?.prompt || "0");
-            const completionPrice = parseFloat(m.pricing?.completion || "0");
-            const isFree = promptPrice === 0 && completionPrice === 0;
+            // 🧠 Heuristic-based tool support detection
+            const supportsTools =
+              id.includes("nemotron") ||
+              id.includes("llama") ||
+              id.includes("kimi") ||
+              m.capabilities?.includes("chat");
+
+            // Optional family filter
+            if (family && !id.toLowerCase().includes(family)) {
+              return null;
+            }
 
             return {
-              id: m.id,
-              name: m.name,
+              id,
+              owned_by: m.owned_by,
               context_length: m.context_length,
-              pricing: m.pricing,
               supports_tools: supportsTools,
-              is_free: isFree,
-              description:
-                m.description?.slice(0, 200) +
-                (m.description?.length > 200 ? "..." : ""),
+              safe_for_agents: supportsTools,
             };
           })
-          // HARD GATES
-          .filter((m) => m.is_free && m.supports_tools);
+          .filter(Boolean)
+          // 🔐 HARD GATE: tools only
+          .filter((m: any) => m.supports_tools);
 
         return {
           count: filtered.length,
           models: filtered,
         };
       } catch (error) {
-        console.error("list_free_tool_models error:", error);
+        console.error("list_nvidia_tool_models error:", error);
         return {
-          error: "Failed to fetch free tool-capable models from OpenRouter",  
+          error: "Failed to fetch NVIDIA models",
         };
       }
     },
   });
-  

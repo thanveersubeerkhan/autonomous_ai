@@ -3,6 +3,7 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { memory } from "../infrastructure/memory";
 import { defaultHooks } from "../hooks/agent-hooks";
 import { Monitor } from "../infrastructure/monitor";
+import { createOpenAI } from "@ai-sdk/openai";
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY!,
@@ -10,6 +11,11 @@ const openrouter = createOpenRouter({
     "HTTP-Referer": "https://voltagentfrontenddbconnection-production.up.railway.app/",
     "X-Title": "Fazzai",
   }
+});
+
+const nvidia = createOpenAI({
+  apiKey: process.env.NVIDIA_API_KEY!,
+  baseURL: "https://integrate.api.nvidia.com/v1",
 });
 
 
@@ -110,7 +116,7 @@ export class AgentManager {
       id: config.id,
       name: config.name,
       instructions: config.instructions,
-      model: openrouter(config.model || "nvidia/nemotron-3-nano-30b-a3b:free"),
+      model: nvidia.chat(config.model || "z-ai/glm4.7"),
       // Map description to purpose for supervisor visibility
       purpose: config.description, 
       // Pass configured subagents
